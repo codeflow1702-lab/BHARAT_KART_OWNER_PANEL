@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#132238"><title>Owner Dashboard | BharatKart Admin</title><link rel="stylesheet" href="css/owner.css"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head>
+<body><div class="layout">
+  <aside class="sidebar"><div class="brand">BharatKart <small>Admin Panel · Owner</small></div><div class="nav-label">Workspace</div><a class="nav-link active" href="dashboard.html"><i class="fa-solid fa-chart-line"></i>Dashboard</a><a class="nav-link" href="products.html"><i class="fa-solid fa-box"></i>Products</a><a class="nav-link" href="coupons.html"><i class="fa-solid fa-ticket"></i>Coupons</a><div class="sidebar-bottom"><button class="logout" id="logoutBtn"><i class="fa-solid fa-arrow-right-from-bracket"></i> Log out</button></div></aside>
+  <main class="main"><header class="topbar"><div><p class="eyebrow">Business overview</p><h1>Owner Dashboard</h1></div><div class="top-actions"><span class="owner-chip" id="ownerEmail">Checking access…</span><button class="btn btn-secondary" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Refresh</button></div></header>
+    <div id="pageMessage" class="message error" role="alert"></div>
+    <section class="stats">
+      <article class="stat"><div class="stat-icon"><i class="fa-solid fa-box"></i></div><strong id="productCount">—</strong><span>Products</span></article>
+      <article class="stat"><div class="stat-icon"><i class="fa-solid fa-ticket"></i></div><strong id="couponCount">—</strong><span>Coupons</span></article>
+      <article class="stat"><div class="stat-icon"><i class="fa-solid fa-cart-shopping"></i></div><strong id="orderCount">—</strong><span>Total orders</span></article>
+      <article class="stat"><div class="stat-icon"><i class="fa-solid fa-users"></i></div><strong id="userCount">—</strong><span>User accounts</span></article>
+    </section>
+    <section class="panel"><p class="eyebrow">Quick actions</p><h2>Manage your store</h2><p class="muted small">These links use the same Firestore products and coupons collections as your current BharatKart site.</p><div class="form-actions"><a class="btn btn-primary" href="products.html"><i class="fa-solid fa-plus"></i> Manage products</a><a class="btn btn-secondary" href="coupons.html"><i class="fa-solid fa-ticket"></i> Manage coupons</a></div></section>
+    <section class="panel"><h2>Before going live</h2><p class="muted small">This is the first owner-panel build. The page verifies the owner account, but Firestore Security Rules must also separate owner permissions from staff permissions before this panel is treated as production-secure. See <strong>SECURITY-BEFORE-DEPLOY.md</strong>.</p></section>
+  </main>
+</div>
+<script type="module">
+  import { db } from "./js/firebase.js";
+  import { requireOwner, logoutOwner } from "./js/owner-auth.js";
+  import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  const ids = ["productCount","couponCount","orderCount","userCount"];
+  document.getElementById("logoutBtn").addEventListener("click", () => logoutOwner());
+  document.getElementById("refreshBtn").addEventListener("click", () => loadStats());
+  requireOwner(async user => { document.getElementById("ownerEmail").textContent = user.email || "Authorized owner"; await loadStats(); });
+  async function loadStats() {
+    const message = document.getElementById("pageMessage"); message.classList.remove("show");
+    ids.forEach(id => document.getElementById(id).textContent = "…");
+    try {
+      const [products, coupons, orders, users] = await Promise.all([
+        getDocs(collection(db,"products")), getDocs(collection(db,"coupons")),
+        getDocs(collection(db,"orders")), getDocs(collection(db,"users"))
+      ]);
+      document.getElementById("productCount").textContent = products.size;
+      document.getElementById("couponCount").textContent = coupons.size;
+      document.getElementById("orderCount").textContent = orders.size;
+      document.getElementById("userCount").textContent = users.size;
+    } catch (error) {
+      console.error("Dashboard stats failed:", error);
+      ids.forEach(id => document.getElementById(id).textContent = "—");
+      message.textContent = "Could not load all dashboard counts. Verify the current Firestore Rules and try Refresh. Details: " + error.message;
+      message.classList.add("show");
+    }
+  }
+</script></body></html>

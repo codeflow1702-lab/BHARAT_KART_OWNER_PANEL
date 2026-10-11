@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#132238"><title>BharatKart Admin Panel | Owner Login</title>
+  <link rel="stylesheet" href="css/owner.css"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="login-logo"><i class="fa-solid fa-shield-halved"></i></div>
+    <p class="eyebrow">BharatKart · Owner access</p>
+    <h1>BharatKart Admin Panel</h1>
+    <p>Sign in with the authorized owner account to manage products and coupons.</p>
+    <div class="message error" id="loginMessage" role="alert"></div>
+    <form id="loginForm">
+      <div class="field"><label for="email">OWNER EMAIL</label><input id="email" type="email" autocomplete="username" required placeholder="Owner email"></div>
+      <div class="field"><label for="password">PASSWORD</label><input id="password" type="password" autocomplete="current-password" required placeholder="Password"></div>
+      <button class="btn btn-primary" id="loginBtn" type="submit"><i class="fa-solid fa-lock"></i> Sign in securely</button>
+    </form>
+    <p class="login-note">This panel uses your existing BharatKart Firebase project. Staff-panel files are not modified by this starter.</p>
+  </main>
+  <script type="module">
+    import { auth, db } from "./js/firebase.js";
+    import { OWNER_UID, verifyOwner } from "./js/owner-auth.js";
+    import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const form = document.getElementById("loginForm");
+    const button = document.getElementById("loginBtn");
+    const message = document.getElementById("loginMessage");
+    const params = new URLSearchParams(location.search);
+    if (params.get("access") === "denied") showError("This account is not authorized for the owner panel.");
+
+    function showError(text) { message.textContent = text; message.classList.add("show"); }
+
+    // If already signed in, proceed only after the owner account check.
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      try {
+        if (await verifyOwner(user)) location.replace("dashboard.html");
+      } catch (error) { console.error(error); }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      message.classList.remove("show");
+      button.disabled = true;
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying owner…';
+      try {
+        const credential = await signInWithEmailAndPassword(auth, document.getElementById("email").value.trim(), document.getElementById("password").value);
+        const user = credential.user;
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const role = userSnap.exists() ? userSnap.data().role : null;
+        if (user.uid !== OWNER_UID || !["owner", "admin"].includes(role)) {
+          await signOut(auth);
+          throw new Error("Access denied. Use the authorized owner account.");
+        }
+        location.replace("dashboard.html");
+      } catch (error) {
+        console.error("Owner login failed:", error);
+        showError(error.code === "auth/invalid-credential" ? "Email or password is incorrect." : error.message || "Could not sign in. Please try again.");
+      } finally {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-lock"></i> Sign in securely';
+      }
+    });
+  </script>
+</body>
+</html>
